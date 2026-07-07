@@ -1,7 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Box, Typography, Button, TextField, List, ListItem, ListItemText, Avatar, IconButton } from "@mui/material";
 import Editor from "@monaco-editor/react";
 import { Play, Send, Terminal as TerminalIcon, MessageSquare, Code, Cpu } from "lucide-react";
+import { io } from "socket.io-client";
+
+// Establish socket connection to backend
+const socket = io("http://localhost:3001");
+const ROOM_ID = "interview-room-1";
 
 // Boilerplate C++ code
 const DEFAULT_CPP_CODE = `#include <iostream>
@@ -31,6 +36,36 @@ export default function App() {
     { id: 2, user: "Vesper", avatar: "V", text: "Almost, just debugging the memory allocation.", time: "18:43" },
   ]);
   const [newMessage, setNewMessage] = useState("");
+
+  const isRemoteChange = useRef(false);
+
+  // Join room and listen for remote code updates
+  useEffect(() => {
+    socket.emit("join_room", ROOM_ID);
+
+    socket.on("receive_code", (newCode: string) => {
+      isRemoteChange.current = true;
+      setCode(newCode);
+    });
+
+    return () => {
+      socket.off("receive_code");
+    };
+  }, []);
+
+  const handleCodeChange = (value: string | undefined) => {
+    setCode(value);
+    
+    // Crucial Anti-Loop Logic
+    if (isRemoteChange.current) {
+      isRemoteChange.current = false;
+      return;
+    }
+    
+    if (value !== undefined) {
+      socket.emit("code_change", { roomId: ROOM_ID, code: value });
+    }
+  };
 
   const handleSendMessage = () => {
     if (!newMessage.trim()) return;
@@ -105,7 +140,7 @@ export default function App() {
             }}
           >
             <Typography variant="body2" sx={{ fontFamily: "monospace", color: "primary.main" }}>
-              ROOM: NEON-77-X
+              ROOM: {ROOM_ID}
             </Typography>
           </Box>
           <Button
@@ -168,7 +203,7 @@ export default function App() {
               theme="vs-dark"
               defaultLanguage="cpp"
               value={code}
-              onChange={(value) => setCode(value)}
+              onChange={handleCodeChange}
               options={{
                 fontSize: 14,
                 fontFamily: "Fira Code, monospace",

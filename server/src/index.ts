@@ -35,6 +35,15 @@ app.get("/health", (_req, res) => {
 io.on("connection", (socket) => {
   console.log(`A user connected: ${socket.id}`);
   
+  socket.on("join_room", (roomId: string) => {
+    socket.join(roomId);
+    console.log(`User ${socket.id} joined room: ${roomId}`);
+  });
+
+  socket.on("code_change", ({ roomId, code }: { roomId: string; code: string }) => {
+    socket.to(roomId).emit("receive_code", code);
+  });
+
   socket.on("disconnect", () => {
     console.log(`User disconnected: ${socket.id}`);
   });
