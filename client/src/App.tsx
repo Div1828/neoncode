@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Box, Typography, Button, TextField, List, ListItem, ListItemText, Avatar, IconButton } from "@mui/material";
 import Editor from "@monaco-editor/react";
-import { Play, Send, Terminal as TerminalIcon, MessageSquare, Code, Cpu } from "lucide-react";
+import { Play, Send, Terminal as TerminalIcon, MessageSquare, Cpu, ShieldAlert } from "lucide-react";
 import { io } from "socket.io-client";
 
 // Establish socket connection to backend
@@ -29,11 +29,11 @@ interface ChatMessage {
 export default function App() {
   const [code, setCode] = useState<string | undefined>(DEFAULT_CPP_CODE);
   const [output, setOutput] = useState<string>(
-    "[NEON-OS v1.0.4] Initializing compiler...\n[STATUS] Compiler ready. Click 'RUN CODE' to execute your program.\n"
+    "[SYSTEM-CORE] Initializing compiler modules...\n[DATALINK] Connecting to cloud Postgres...\n[STATUS] Terminal active. Press RUN CODE to compile.\n"
   );
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { id: 1, user: "Kaelen", avatar: "K", text: "Yo, did you finish the search algorithm?", time: "18:42" },
-    { id: 2, user: "Vesper", avatar: "V", text: "Almost, just debugging the memory allocation.", time: "18:43" },
+    { id: 1, user: "Kaelen", avatar: "K", text: "Algorithm compiled. Synced state with cloud.", time: "22:15" },
+    { id: 2, user: "Vesper", avatar: "V", text: "Excellent, checking room logs.", time: "22:17" },
   ]);
   const [newMessage, setNewMessage] = useState("");
 
@@ -81,7 +81,11 @@ export default function App() {
   };
 
   const handleRunCode = () => {
-    setOutput((prev) => prev + `\n$ g++ main.cpp -o main && ./main\n⚡ NEONCODE ENGINE v1.0 ⚡\nCompile & Execute Success!\n[PROCESS COMPLETED WITH EXIT CODE 0]\n`);
+    setOutput(
+      (prev) =>
+        prev +
+        `\n$ g++ main.cpp -o main && ./main\n[COMPILING CODE STATE...]\n⚡ NEONCODE ENGINE v1.0 ⚡\nCompile & Execute Success!\n[DATABASE WRITTEN SUCCESSFULLY]\n`
+    );
   };
 
   return (
@@ -92,69 +96,84 @@ export default function App() {
         height: "100vh",
         width: "100vw",
         overflow: "hidden",
-        backgroundColor: "background.default",
-        color: "text.primary",
+        backgroundColor: "#050512",
+        color: "#e2e8f0",
+        position: "relative",
       }}
     >
-      {/* Top Navigation */}
+      {/* Top Header Panel */}
       <Box
         component="header"
         sx={{
-          height: "60px",
+          height: "65px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           px: 3,
-          backgroundColor: "#070715",
-          borderBottom: "2px solid rgba(0, 240, 255, 0.3)",
-          boxShadow: "0 0 15px rgba(0, 240, 255, 0.15)",
+          backgroundColor: "rgba(7, 7, 24, 0.8)",
+          backdropFilter: "blur(12px)",
+          borderBottom: "2px solid #00f0ff",
+          boxShadow: "0 0 20px rgba(0, 240, 255, 0.35)",
           zIndex: 10,
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-          <Cpu size={24} color="#00f0ff" />
+          <Cpu size={24} color="#00f0ff" style={{ filter: "drop-shadow(0 0 5px #00f0ff)" }} />
           <Typography
             variant="h5"
             sx={{
-              fontFamily: "'Outfit', sans-serif",
-              fontWeight: 800,
               color: "primary.main",
-              textShadow: "0 0 8px rgba(0, 240, 255, 0.6)",
-              letterSpacing: "2px",
+              animation: "glitch 2s infinite steps(2)",
+              letterSpacing: "4px",
+              fontWeight: 900,
             }}
           >
             NeonCode
           </Typography>
         </Box>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
+          {/* Matrix connection status indicator */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                backgroundColor: "#39ff14",
+                boxShadow: "0 0 10px #39ff14, 0 0 18px #39ff14",
+                animation: "blink-matrix 1.2s infinite",
+              }}
+            />
+            <Typography
+              variant="caption"
+              sx={{
+                fontFamily: "'Fira Code', monospace",
+                color: "#39ff14",
+                fontWeight: 700,
+                letterSpacing: "1.5px",
+                textShadow: "0 0 5px rgba(57, 255, 20, 0.6)",
+              }}
+            >
+              LIVE HACK LINK
+            </Typography>
+          </Box>
+
           <Box
             sx={{
               display: "flex",
               alignItems: "center",
               gap: 1,
               backgroundColor: "rgba(0, 240, 255, 0.05)",
-              border: "1px dashed rgba(0, 240, 255, 0.4)",
+              border: "1px solid rgba(0, 240, 255, 0.4)",
+              boxShadow: "0 0 10px rgba(0, 240, 255, 0.2)",
               px: 2,
               py: 0.5,
-              borderRadius: 1,
             }}
           >
-            <Typography variant="body2" sx={{ fontFamily: "monospace", color: "primary.main" }}>
-              ROOM: {ROOM_ID}
+            <Typography variant="body2" sx={{ fontFamily: "'Fira Code', monospace", color: "primary.main", fontWeight: 700 }}>
+              PORTAL: {ROOM_ID}
             </Typography>
           </Box>
-          <Button
-            variant="outlined"
-            size="small"
-            color="primary"
-            startIcon={<Code size={16} />}
-            sx={{
-              borderWidth: "1px",
-              boxShadow: "0 0 8px rgba(0, 240, 255, 0.1)",
-            }}
-          >
-            Share Room
-          </Button>
         </Box>
       </Box>
 
@@ -163,20 +182,25 @@ export default function App() {
         sx={{
           display: "flex",
           flex: 1,
-          height: "calc(100vh - 60px)",
+          height: "calc(100vh - 65px)",
           width: "100%",
           overflow: "hidden",
+          p: 1.5,
+          gap: 1.5,
+          zIndex: 2,
         }}
       >
-        {/* Left Pane - Editor (70% width) */}
+        {/* Left Pane - Editor (70% width) - Holographic Glass Layout */}
         <Box
           sx={{
             width: "70%",
             height: "100%",
             display: "flex",
             flexDirection: "column",
-            borderRight: "1px solid rgba(0, 240, 255, 0.15)",
-            position: "relative",
+            backgroundColor: "rgba(5, 5, 20, 0.8)",
+            backdropFilter: "blur(20px)",
+            border: "1px solid rgba(0, 240, 255, 0.3)",
+            boxShadow: "inset 0 0 20px rgba(0, 240, 255, 0.08), 0 0 15px rgba(0, 240, 255, 0.1)",
           }}
         >
           <Box
@@ -185,19 +209,19 @@ export default function App() {
               alignItems: "center",
               justifyContent: "space-between",
               px: 2,
-              py: 1,
-              backgroundColor: "background.paper",
-              borderBottom: "1px solid rgba(0, 240, 255, 0.1)",
+              py: 1.2,
+              backgroundColor: "rgba(14, 14, 40, 0.7)",
+              borderBottom: "1px solid rgba(0, 240, 255, 0.2)",
             }}
           >
-            <Typography variant="body2" sx={{ fontFamily: "monospace", color: "primary.main" }}>
+            <Typography variant="body2" sx={{ fontFamily: "'Fira Code', monospace", color: "primary.main", fontWeight: 700 }}>
               main.cpp
             </Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.75rem" }}>
-              C++ • UTF-8
+            <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.75rem", fontFamily: "'Fira Code', monospace" }}>
+              C++ • MATRIX-FEED
             </Typography>
           </Box>
-          <Box sx={{ flex: 1, width: "100%", height: "100%" }}>
+          <Box sx={{ flex: 1, width: "100%", height: "100%", p: 0.5 }}>
             <Editor
               height="100%"
               theme="vs-dark"
@@ -206,13 +230,15 @@ export default function App() {
               onChange={handleCodeChange}
               options={{
                 fontSize: 14,
-                fontFamily: "Fira Code, monospace",
+                fontFamily: "'Fira Code', monospace",
                 minimap: { enabled: false },
                 scrollbar: {
                   vertical: "visible",
                   horizontal: "visible",
                 },
-                padding: { top: 15 },
+                padding: { top: 10 },
+                lineNumbersMinChars: 3,
+                renderLineHighlight: "all",
               }}
             />
           </Box>
@@ -225,17 +251,20 @@ export default function App() {
             height: "100%",
             display: "flex",
             flexDirection: "column",
-            backgroundColor: "background.paper",
+            gap: 1.5,
           }}
         >
-          {/* Chat Section */}
+          {/* Chat Section - Holographic Glass Layout */}
           <Box
             sx={{
-              flex: 1,
+              flex: 1.2,
               display: "flex",
               flexDirection: "column",
               overflow: "hidden",
-              borderBottom: "1px solid rgba(0, 240, 255, 0.15)",
+              backgroundColor: "rgba(5, 5, 20, 0.8)",
+              backdropFilter: "blur(20px)",
+              border: "1px solid rgba(0, 240, 255, 0.3)",
+              boxShadow: "0 0 15px rgba(0, 240, 255, 0.05)",
             }}
           >
             <Box
@@ -243,23 +272,21 @@ export default function App() {
                 p: 2,
                 display: "flex",
                 alignItems: "center",
-                gap: 1,
-                borderBottom: "1px solid rgba(0, 240, 255, 0.1)",
-                backgroundColor: "rgba(0, 240, 255, 0.02)",
+                gap: 1.5,
+                borderBottom: "1px solid rgba(0, 240, 255, 0.2)",
+                backgroundColor: "rgba(0, 240, 255, 0.03)",
               }}
             >
-              <MessageSquare size={18} color="#00f0ff" />
+              <MessageSquare size={18} color="#00f0ff" style={{ filter: "drop-shadow(0 0 3px #00f0ff)" }} />
               <Typography
                 variant="subtitle2"
                 sx={{
-                  fontFamily: "'Outfit', sans-serif",
-                  fontWeight: 700,
                   color: "primary.main",
                   textTransform: "uppercase",
-                  letterSpacing: "1px",
+                  fontWeight: 700,
                 }}
               >
-                Secure Chat Channel
+                Secure Comms Feed
               </Typography>
             </Box>
 
@@ -280,7 +307,7 @@ export default function App() {
                     key={msg.id}
                     alignItems="flex-start"
                     disablePadding
-                    sx={{ mb: 1.5 }}
+                    sx={{ mb: 2 }}
                   >
                     <Avatar
                       sx={{
@@ -288,9 +315,10 @@ export default function App() {
                         height: 32,
                         mr: 1.5,
                         backgroundColor: msg.user === "You" ? "secondary.main" : "primary.main",
-                        color: "#0a0a1a",
-                        fontWeight: 700,
+                        color: "#050512",
+                        fontWeight: 800,
                         fontSize: "0.85rem",
+                        boxShadow: `0 0 8px ${msg.user === "You" ? "#ff003c" : "#00f0ff"}`
                       }}
                     >
                       {msg.avatar}
@@ -298,10 +326,10 @@ export default function App() {
                     <ListItemText
                       primary={
                         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: msg.user === "You" ? "secondary.main" : "primary.main" }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 800, color: msg.user === "You" ? "secondary.main" : "primary.main" }}>
                             {msg.user}
                           </Typography>
-                          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                          <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace" }}>
                             {msg.time}
                           </Typography>
                         </Box>
@@ -309,7 +337,7 @@ export default function App() {
                       secondary={
                         <Typography
                           variant="body2"
-                          sx={{ color: "text.primary", mt: 0.5, wordBreak: "break-word" }}
+                          sx={{ color: "#cbd5e1", mt: 0.5, wordBreak: "break-word", fontFamily: "'Fira Code', monospace", fontSize: "0.8rem" }}
                         >
                           {msg.text}
                         </Typography>
@@ -324,30 +352,34 @@ export default function App() {
             <Box
               sx={{
                 p: 1.5,
-                borderTop: "1px solid rgba(0, 240, 255, 0.1)",
+                borderTop: "1px solid rgba(0, 240, 255, 0.2)",
                 display: "flex",
                 gap: 1,
-                backgroundColor: "#080816",
+                backgroundColor: "rgba(6, 6, 20, 0.9)",
               }}
             >
               <TextField
                 size="small"
                 fullWidth
-                placeholder="Type transmission..."
+                placeholder="Secure uplink broadcast..."
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
                 sx={{
                   "& .MuiOutlinedInput-root": {
-                    backgroundColor: "rgba(255, 255, 255, 0.03)",
+                    backgroundColor: "rgba(0, 240, 255, 0.02)",
+                    borderRadius: "0px",
+                    fontFamily: "'Fira Code', monospace",
+                    fontSize: "0.85rem",
                     "& fieldset": {
-                      borderColor: "rgba(0, 240, 255, 0.2)",
+                      borderColor: "rgba(0, 240, 255, 0.3)",
                     },
                     "&:hover fieldset": {
-                      borderColor: "rgba(0, 240, 255, 0.4)",
+                      borderColor: "rgba(0, 240, 255, 0.6)",
                     },
                     "&.Mui-focused fieldset": {
                       borderColor: "primary.main",
+                      boxShadow: "0 0 10px rgba(0, 240, 255, 0.3)",
                     },
                   },
                 }}
@@ -357,9 +389,12 @@ export default function App() {
                 onClick={handleSendMessage}
                 disabled={!newMessage.trim()}
                 sx={{
-                  backgroundColor: "rgba(0, 240, 255, 0.1)",
+                  borderRadius: "0px",
+                  border: "1px solid #00f0ff",
+                  backgroundColor: "rgba(0, 240, 255, 0.05)",
                   "&:hover": {
                     backgroundColor: "rgba(0, 240, 255, 0.2)",
+                    boxShadow: "0 0 10px rgba(0, 240, 255, 0.5)",
                   },
                 }}
               >
@@ -368,13 +403,19 @@ export default function App() {
             </Box>
           </Box>
 
-          {/* Terminal / Run Section */}
+          {/* Terminal / Run Section - Holographic Glass Layout with custom border styling */}
           <Box
             sx={{
-              height: "40%",
+              flex: 0.8,
               display: "flex",
               flexDirection: "column",
               overflow: "hidden",
+              backgroundColor: "rgba(5, 5, 20, 0.8)",
+              backdropFilter: "blur(20px)",
+              border: "1px solid rgba(0, 240, 255, 0.3)",
+              borderLeft: "3px solid #ff003c",
+              borderBottom: "3px solid #39ff14",
+              boxShadow: "0 0 15px rgba(255, 0, 60, 0.15), 0 0 15px rgba(57, 255, 20, 0.1)",
             }}
           >
             {/* Terminal Header & Action Button */}
@@ -384,36 +425,37 @@ export default function App() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                backgroundColor: "rgba(255, 0, 60, 0.02)",
-                borderBottom: "1px solid rgba(255, 0, 60, 0.15)",
+                backgroundColor: "rgba(10, 7, 21, 0.7)",
+                borderBottom: "1px solid rgba(255, 0, 60, 0.2)",
               }}
             >
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <TerminalIcon size={18} color="#ff003c" />
+                <TerminalIcon size={18} color="#ff003c" style={{ filter: "drop-shadow(0 0 3px #ff003c)" }} />
                 <Typography
                   variant="subtitle2"
                   sx={{
-                    fontFamily: "'Outfit', sans-serif",
-                    fontWeight: 700,
                     color: "secondary.main",
-                    letterSpacing: "1px",
+                    textShadow: "0 0 5px rgba(255, 0, 60, 0.4)",
                   }}
                 >
-                  SYSTEM CONSOLE
+                  SYSTEM CORE CONSOLE
                 </Typography>
               </Box>
 
               <Button
                 variant="contained"
-                color="secondary"
-                size="small"
                 onClick={handleRunCode}
                 startIcon={<Play size={14} />}
                 sx={{
-                  px: 2,
-                  boxShadow: "0 0 12px rgba(255, 0, 60, 0.4)",
+                  backgroundColor: "#ff003c",
+                  color: "#ffffff",
+                  px: 2.5,
+                  py: 0.5,
+                  fontSize: "0.75rem",
+                  boxShadow: "0 0 12px rgba(255, 0, 60, 0.5)",
+                  animation: "pulseGlow 2s infinite", // Permanent pulseGlow animation
                   "&:hover": {
-                    boxShadow: "0 0 20px rgba(255, 0, 60, 0.7)",
+                    backgroundColor: "#ff003c",
                   },
                 }}
               >
@@ -425,25 +467,56 @@ export default function App() {
             <Box
               sx={{
                 flex: 1,
-                backgroundColor: "#03030b",
+                backgroundColor: "rgba(3, 3, 9, 0.9)",
                 p: 2,
                 overflowY: "auto",
+                position: "relative",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
               }}
             >
               <Typography
                 component="pre"
                 sx={{
                   margin: 0,
-                  fontFamily: "Fira Code, monospace",
+                  fontFamily: "'Fira Code', monospace",
                   fontSize: "0.8rem",
                   color: "#39ff14",
-                  textShadow: "0 0 5px rgba(57, 255, 20, 0.3)",
+                  textShadow: "0 0 5px #39ff14, 0 0 15px rgba(57, 255, 20, 0.6)", // High-brightness phosphor monitor glow
                   whiteSpace: "pre-wrap",
                   lineHeight: 1.6,
                 }}
               >
                 {output}
               </Typography>
+
+              {/* Critical warning hint */}
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  mt: 2,
+                  pt: 1,
+                  borderTop: "1px dashed rgba(255, 0, 60, 0.3)",
+                }}
+              >
+                <ShieldAlert size={14} color="#ff003c" />
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontFamily: "'Fira Code', monospace",
+                    color: "secondary.main",
+                    fontSize: "0.68rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.5px",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  [CRITICAL] EXECUTE RUN CODE TO PERMANENTLY COMMIT STATE TO CLOUD POSTGRES
+                </Typography>
+              </Box>
             </Box>
           </Box>
         </Box>
