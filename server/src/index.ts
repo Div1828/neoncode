@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import http from "http";
 import { Server } from "socket.io";
-import { PrismaClient } from "./generated/prisma/client";
+import { PrismaClient } from "./generated/prisma";
 import dotenv from "dotenv";
 
 // Load environment variables
@@ -24,7 +24,9 @@ const io = new Server(server, {
 });
 
 // Initialize Prisma Client
-export const prisma = new PrismaClient({} as any);
+export const prisma = new PrismaClient({
+  accelerateUrl: process.env.DATABASE_URL || "postgres://placeholder"
+});
 
 // Basic test route
 app.get("/health", (_req, res) => {
