@@ -51,6 +51,31 @@ export default function App() {
     setRoomId(room);
   }, [token]);
 
+  // Fetch saved code state from server database when roomId changes
+  useEffect(() => {
+    if (!token || !roomId) return;
+
+    setOutput((prev) => prev + `\n[DATALINK] Fetching remote room state for room ${roomId}...\n`);
+
+    const fetchRoomCode = async () => {
+      try {
+        const response = await fetch(`http://localhost:3001/api/room/${roomId}`);
+        const data = await response.json();
+        if (data.code !== null && data.code !== undefined) {
+          isRemoteChange.current = true;
+          setCode(data.code);
+          setOutput((prev) => prev + `[DATALINK] State hydrated successfully.\n`);
+        } else {
+          setOutput((prev) => prev + `[DATALINK] No existing state found. Initialized with C++ boilerplate.\n`);
+        }
+      } catch (err: any) {
+        setOutput((prev) => prev + `[DATALINK] Connection error during hydration: ${err.message}\n`);
+      }
+    };
+
+    fetchRoomCode();
+  }, [roomId, token]);
+
   // Join room and listen for remote code updates
   useEffect(() => {
     if (!token || !roomId) return;
@@ -102,7 +127,7 @@ export default function App() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, roomId }), // Pass roomId for PostgreSQL upsert
       });
       const data = await response.json();
       if (data.stderr) {

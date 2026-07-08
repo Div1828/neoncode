@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 
 import authRouter from "./routes/auth";
 import executeRouter from "./routes/execute";
+import roomRouter from "./routes/room";
 
 // Load environment variables
 dotenv.config();
@@ -21,6 +22,7 @@ app.use(express.json());
 // Mount routers
 app.use("/auth", authRouter);
 app.use(executeRouter);
+app.use("/api", roomRouter);
 
 // Integrate Socket.io
 const io = new Server(server, {

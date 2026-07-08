@@ -2,14 +2,28 @@ import { Router, Request, Response } from "express";
 import { exec } from "child_process";
 import fs from "fs";
 import path from "path";
+import { prisma } from "../index";
 
 const router = Router();
 
-router.post("/run", (req: Request, res: Response): any => {
-  const { code } = req.body;
+router.post("/run", async (req: Request, res: Response): Promise<any> => {
+  const { code, roomId } = req.body;
   if (code === undefined) {
     res.status(400).json({ error: "Code is required" });
     return;
+  }
+
+  // Persist code state to Postgres room model
+  if (roomId) {
+    try {
+      await prisma.room.upsert({
+        where: { roomId },
+        update: { currentCode: code },
+        create: { roomId, currentCode: code },
+      });
+    } catch (dbErr) {
+      console.error("Prisma upsert error:", dbErr);
+    }
   }
 
   const id = Math.random().toString(36).substring(7);
