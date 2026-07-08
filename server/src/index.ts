@@ -8,6 +8,7 @@ import dotenv from "dotenv";
 import authRouter from "./routes/auth";
 import executeRouter from "./routes/execute";
 import roomRouter from "./routes/room";
+import chatRouter from "./routes/chat";
 
 // Load environment variables
 dotenv.config();
@@ -23,6 +24,7 @@ app.use(express.json());
 app.use("/auth", authRouter);
 app.use(executeRouter);
 app.use("/api", roomRouter);
+app.use("/api/chat", chatRouter);
 
 // Integrate Socket.io
 const io = new Server(server, {
@@ -53,6 +55,10 @@ io.on("connection", (socket) => {
 
   socket.on("code_change", ({ roomId, code }: { roomId: string; code: string }) => {
     socket.to(roomId).emit("receive_code", code);
+  });
+
+  socket.on("chat_message", ({ roomId, message }: { roomId: string; message: any }) => {
+    socket.to(roomId).emit("receive_chat", message);
   });
 
   socket.on("disconnect", () => {

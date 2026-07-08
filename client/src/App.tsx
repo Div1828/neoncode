@@ -19,7 +19,7 @@ int main() {
 `;
 
 interface ChatMessage {
-  id: number;
+  id: number | string;
   user: string;
   avatar: string;
   text: string;
@@ -76,7 +76,34 @@ export default function App() {
     fetchRoomCode();
   }, [roomId, token]);
 
-  // Join room and listen for remote code updates
+  // Fetch chat logs from database when roomId changes
+  useEffect(() => {
+    if (!token || !roomId) return;
+
+    const fetchChatHistory = async () => {
+      try {
+        const response = await fetch(`http://localhost:3001/api/chat/${roomId}`);
+        if (!response.ok) throw new Error("Failed to fetch chat logs");
+        const data = await response.json();
+
+        const formatted = data.map((msg: any) => ({
+          id: msg.id,
+          user: msg.author.username,
+          avatar: msg.author.username.charAt(0).toUpperCase(),
+          text: msg.content,
+          time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        }));
+        
+        setChatMessages(formatted);
+      } catch (err: any) {
+        console.error("Failed to load chat history:", err);
+      }
+    };
+
+    fetchChatHistory();
+  }, [roomId, token]);
+
+  // Join room and listen for remote code and chat updates
   useEffect(() => {
     if (!token || !roomId) return;
     socket.emit("join_room", roomId);
@@ -86,8 +113,13 @@ export default function App() {
       setCode(newCode);
     });
 
+    socket.on("receive_chat", (newMsg: ChatMessage) => {
+      setChatMessages((prev) => [...prev, newMsg]);
+    });
+
     return () => {
       socket.off("receive_code");
+      socket.off("receive_chat");
     };
   }, [roomId, token]);
 
@@ -105,17 +137,35 @@ export default function App() {
     }
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!newMessage.trim() || !username) return;
-    const msg: ChatMessage = {
-      id: Date.now(),
-      user: username,
-      avatar: username.charAt(0).toUpperCase(),
-      text: newMessage,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-    setChatMessages([...chatMessages, msg]);
-    setNewMessage("");
+
+    try {
+      const response = await fetch(`http://localhost:3001/api/chat/${roomId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, content: newMessage }),
+      });
+
+      if (!response.ok) throw new Error("Failed to send message");
+      const data = await response.json();
+
+      const formattedMsg: ChatMessage = {
+        id: data.id,
+        user: data.author.username,
+        avatar: data.author.username.charAt(0).toUpperCase(),
+        text: data.content,
+        time: new Date(data.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      setChatMessages((prev) => [...prev, formattedMsg]);
+      socket.emit("chat_message", { roomId, message: formattedMsg });
+      setNewMessage("");
+    } catch (err: any) {
+      console.error("Error sending chat payload:", err);
+    }
   };
 
   const handleRunCode = async () => {
