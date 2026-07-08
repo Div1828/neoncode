@@ -5,6 +5,9 @@ import { Server } from "socket.io";
 import { PrismaClient } from "./generated/prisma";
 import dotenv from "dotenv";
 
+import authRouter from "./routes/auth";
+import executeRouter from "./routes/execute";
+
 // Load environment variables
 dotenv.config();
 
@@ -14,6 +17,10 @@ const server = http.createServer(app);
 // Configure CORS
 app.use(cors());
 app.use(express.json());
+
+// Mount routers
+app.use("/auth", authRouter);
+app.use(executeRouter);
 
 // Integrate Socket.io
 const io = new Server(server, {

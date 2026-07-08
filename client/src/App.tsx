@@ -1,19 +1,19 @@
 import { useState, useEffect, useRef } from "react";
 import { Box, Typography, Button, TextField, List, ListItem, ListItemText, Avatar, IconButton } from "@mui/material";
 import Editor from "@monaco-editor/react";
-import { Play, Send, Terminal as TerminalIcon, MessageSquare, Cpu, ShieldAlert } from "lucide-react";
+import { Play, Send, Terminal as TerminalIcon, MessageSquare, Cpu, ShieldAlert, LogOut } from "lucide-react";
 import { io } from "socket.io-client";
+import Auth from "./Auth";
 
 // Establish socket connection to backend
 const socket = io("http://localhost:3001");
-const ROOM_ID = "interview-room-1";
 
 // Boilerplate C++ code
 const DEFAULT_CPP_CODE = `#include <iostream>
 
 int main() {
     std::cout << "⚡ NEONCODE ENGINE v1.0 ⚡" << std::endl;
-    std::cout << "Compile & Execute Success!" << std::endl;
+    std::cout << "System ready. Write your C++ code here." << std::endl;
     return 0;
 }
 `;
@@ -27,21 +27,34 @@ interface ChatMessage {
 }
 
 export default function App() {
+  const [token, setToken] = useState<string | null>(localStorage.getItem("token"));
+  const [username, setUsername] = useState<string | null>(localStorage.getItem("username"));
   const [code, setCode] = useState<string | undefined>(DEFAULT_CPP_CODE);
   const [output, setOutput] = useState<string>(
     "[SYSTEM-CORE] Initializing compiler modules...\n[DATALINK] Connecting to cloud Postgres...\n[STATUS] Terminal active. Press RUN CODE to compile.\n"
   );
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { id: 1, user: "Kaelen", avatar: "K", text: "Algorithm compiled. Synced state with cloud.", time: "22:15" },
-    { id: 2, user: "Vesper", avatar: "V", text: "Excellent, checking room logs.", time: "22:17" },
-  ]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  const [roomId, setRoomId] = useState("");
 
   const isRemoteChange = useRef(false);
 
+  // Initialize Room ID from query parameter or generate new one
+  useEffect(() => {
+    if (!token) return;
+    const params = new URLSearchParams(window.location.search);
+    let room = params.get("room");
+    if (!room) {
+      room = Math.random().toString(36).substring(2, 8);
+      window.history.replaceState(null, "", `?room=${room}`);
+    }
+    setRoomId(room);
+  }, [token]);
+
   // Join room and listen for remote code updates
   useEffect(() => {
-    socket.emit("join_room", ROOM_ID);
+    if (!token || !roomId) return;
+    socket.emit("join_room", roomId);
 
     socket.on("receive_code", (newCode: string) => {
       isRemoteChange.current = true;
@@ -51,7 +64,7 @@ export default function App() {
     return () => {
       socket.off("receive_code");
     };
-  }, []);
+  }, [roomId, token]);
 
   const handleCodeChange = (value: string | undefined) => {
     setCode(value);
@@ -62,17 +75,17 @@ export default function App() {
       return;
     }
     
-    if (value !== undefined) {
-      socket.emit("code_change", { roomId: ROOM_ID, code: value });
+    if (value !== undefined && roomId) {
+      socket.emit("code_change", { roomId, code: value });
     }
   };
 
   const handleSendMessage = () => {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !username) return;
     const msg: ChatMessage = {
       id: Date.now(),
-      user: "You",
-      avatar: "U",
+      user: username,
+      avatar: username.charAt(0).toUpperCase(),
       text: newMessage,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
@@ -80,13 +93,44 @@ export default function App() {
     setNewMessage("");
   };
 
-  const handleRunCode = () => {
-    setOutput(
-      (prev) =>
-        prev +
-        `\n$ g++ main.cpp -o main && ./main\n[COMPILING CODE STATE...]\n⚡ NEONCODE ENGINE v1.0 ⚡\nCompile & Execute Success!\n[DATABASE WRITTEN SUCCESSFULLY]\n`
-    );
+  const handleRunCode = async () => {
+    if (!code) return;
+    setOutput((prev) => prev + `\n$ g++ main.cpp -o main && ./main\n[COMPILING & EXECUTING...]\n`);
+    try {
+      const response = await fetch("http://localhost:3001/run", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ code }),
+      });
+      const data = await response.json();
+      if (data.stderr) {
+        setOutput((prev) => prev + `\n[STDERR]\n${data.stderr}\n`);
+      } else {
+        setOutput((prev) => prev + `${data.stdout || ""}\n[PROCESS COMPLETED WITH EXIT CODE 0]\n`);
+      }
+    } catch (err: any) {
+      setOutput((prev) => prev + `\n[SYSTEM ERROR] Failed to contact compile agent: ${err.message}\n`);
+    }
   };
+
+  const handleAuthSuccess = (newToken: string, newUsername: string) => {
+    setToken(newToken);
+    setUsername(newUsername);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("username");
+    setToken(null);
+    setUsername(null);
+  };
+
+  // Guard routing / show login
+  if (!token) {
+    return <Auth onAuthSuccess={handleAuthSuccess} />;
+  }
 
   return (
     <Box
@@ -171,8 +215,31 @@ export default function App() {
             }}
           >
             <Typography variant="body2" sx={{ fontFamily: "'Fira Code', monospace", color: "primary.main", fontWeight: 700 }}>
-              PORTAL: {ROOM_ID}
+              PORTAL: {roomId}
             </Typography>
+          </Box>
+
+          {/* User logout */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Typography variant="body2" sx={{ fontFamily: "'Fira Code', monospace", color: "text.primary", fontSize: "0.85rem", fontWeight: 600 }}>
+              {username}
+            </Typography>
+            <IconButton
+              color="secondary"
+              onClick={handleLogout}
+              sx={{
+                borderRadius: "0px",
+                border: "1px solid rgba(255, 0, 60, 0.3)",
+                p: 0.75,
+                backgroundColor: "rgba(255, 0, 60, 0.02)",
+                "&:hover": {
+                  backgroundColor: "rgba(255, 0, 60, 0.15)",
+                  boxShadow: "0 0 8px rgba(255, 0, 60, 0.4)",
+                },
+              }}
+            >
+              <LogOut size={16} />
+            </IconButton>
           </Box>
         </Box>
       </Box>
@@ -301,51 +368,59 @@ export default function App() {
                 gap: 1.5,
               }}
             >
-              <List disablePadding>
-                {chatMessages.map((msg) => (
-                  <ListItem
-                    key={msg.id}
-                    alignItems="flex-start"
-                    disablePadding
-                    sx={{ mb: 2 }}
-                  >
-                    <Avatar
-                      sx={{
-                        width: 32,
-                        height: 32,
-                        mr: 1.5,
-                        backgroundColor: msg.user === "You" ? "secondary.main" : "primary.main",
-                        color: "#050512",
-                        fontWeight: 800,
-                        fontSize: "0.85rem",
-                        boxShadow: `0 0 8px ${msg.user === "You" ? "#ff003c" : "#00f0ff"}`
-                      }}
+              {chatMessages.length === 0 ? (
+                <Box sx={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "center", opacity: 0.4 }}>
+                  <Typography variant="body2" sx={{ fontFamily: "'Fira Code', monospace" }}>
+                    [NO TRANSMISSIONS DETECTED]
+                  </Typography>
+                </Box>
+              ) : (
+                <List disablePadding>
+                  {chatMessages.map((msg) => (
+                    <ListItem
+                      key={msg.id}
+                      alignItems="flex-start"
+                      disablePadding
+                      sx={{ mb: 2 }}
                     >
-                      {msg.avatar}
-                    </Avatar>
-                    <ListItemText
-                      primary={
-                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 800, color: msg.user === "You" ? "secondary.main" : "primary.main" }}>
-                            {msg.user}
+                      <Avatar
+                        sx={{
+                          width: 32,
+                          height: 32,
+                          mr: 1.5,
+                          backgroundColor: msg.user === username ? "secondary.main" : "primary.main",
+                          color: "#050512",
+                          fontWeight: 800,
+                          fontSize: "0.85rem",
+                          boxShadow: `0 0 8px ${msg.user === username ? "#ff003c" : "#00f0ff"}`
+                        }}
+                      >
+                        {msg.avatar}
+                      </Avatar>
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: msg.user === username ? "secondary.main" : "primary.main" }}>
+                              {msg.user}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace" }}>
+                              {msg.time}
+                            </Typography>
+                          </Box>
+                        }
+                        secondary={
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "#cbd5e1", mt: 0.5, wordBreak: "break-word", fontFamily: "'Fira Code', monospace", fontSize: "0.8rem" }}
+                          >
+                            {msg.text}
                           </Typography>
-                          <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace" }}>
-                            {msg.time}
-                          </Typography>
-                        </Box>
-                      }
-                      secondary={
-                        <Typography
-                          variant="body2"
-                          sx={{ color: "#cbd5e1", mt: 0.5, wordBreak: "break-word", fontFamily: "'Fira Code', monospace", fontSize: "0.8rem" }}
-                        >
-                          {msg.text}
-                        </Typography>
-                      }
-                    />
-                  </ListItem>
-                ))}
-              </List>
+                        }
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
             </Box>
 
             {/* Chat Input */}
