@@ -40,6 +40,7 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [roomId, setRoomId] = useState("");
+  const [activeUsers, setActiveUsers] = useState<string[]>([]);
 
   const isRemoteChange = useRef(false);
   const isRemoteInputChange = useRef(false);
@@ -67,7 +68,7 @@ export default function App() {
 
     const fetchRoomCode = async () => {
       try {
-        const response = await fetch(`http://localhost:3001/api/room/${roomId}`);
+        const response = await fetch(`http://localhost:3001/api/room/${roomId}?username=${username}`);
         const data = await response.json();
         if (data.code !== null && data.code !== undefined) {
           isRemoteChange.current = true;
@@ -116,8 +117,8 @@ export default function App() {
 
   // Join room and listen for remote code and chat updates
   useEffect(() => {
-    if (!token || !roomId) return;
-    socket.emit("join_room", roomId);
+    if (!token || !roomId || !username) return;
+    socket.emit("join_room", { roomId, username });
 
     socket.on("receive_code", (newCode: string) => {
       isRemoteChange.current = true;
@@ -133,6 +134,10 @@ export default function App() {
       setProgramOutput(newOutput);
     });
 
+    socket.on("room_users", (users: string[]) => {
+      setActiveUsers(users);
+    });
+
     socket.on("receive_chat", (newMsg: ChatMessage) => {
       setChatMessages((prev) => [...prev, newMsg]);
     });
@@ -141,9 +146,28 @@ export default function App() {
       socket.off("receive_code");
       socket.off("receive_input");
       socket.off("receive_output");
+      socket.off("room_users");
       socket.off("receive_chat");
     };
-  }, [roomId, token]);
+  }, [roomId, token, username]);
+
+  const handleEditorBeforeMount = (monaco: any) => {
+    monaco.editor.defineTheme("cyberpunk-theme", {
+      base: "vs-dark",
+      inherit: true,
+      rules: [
+        { token: "", foreground: "cbd5e1" },
+        { token: "comment", foreground: "64748b", fontStyle: "italic" },
+        { token: "keyword", foreground: "ff003c", fontStyle: "bold" },
+        { token: "number", foreground: "00f0ff" },
+        { token: "string", foreground: "39ff14" },
+      ],
+      colors: {
+        "editor.background": "#00000000",
+        "editor.lineHighlightBackground": "rgba(0, 240, 255, 0.05)",
+      },
+    });
+  };
 
   const handleCodeChange = (value: string | undefined) => {
     setCode(value);
@@ -321,6 +345,46 @@ export default function App() {
             </Typography>
           </Box>
 
+          {/* Active room members list */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Typography
+              variant="caption"
+              sx={{
+                fontFamily: "'Fira Code', monospace",
+                color: "#ff003c",
+                fontWeight: 700,
+                letterSpacing: "1px",
+              }}
+            >
+              UPLINKS:
+            </Typography>
+            {activeUsers.map((user) => (
+              <Box
+                key={user}
+                sx={{
+                  backgroundColor: user === username ? "rgba(0, 240, 255, 0.15)" : "rgba(57, 255, 20, 0.15)",
+                  border: `1px solid ${user === username ? "#00f0ff" : "#39ff14"}`,
+                  borderRadius: "0px",
+                  px: 1,
+                  py: 0.2,
+                  boxShadow: `0 0 6px ${user === username ? "rgba(0, 240, 255, 0.4)" : "rgba(57, 255, 20, 0.4)"}`,
+                }}
+              >
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontFamily: "'Fira Code', monospace",
+                    color: user === username ? "#00f0ff" : "#39ff14",
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                  }}
+                >
+                  {user.toUpperCase()}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+
           <Box
             sx={{
               display: "flex",
@@ -392,7 +456,21 @@ export default function App() {
               flex: 6.5,
               display: "flex",
               flexDirection: "column",
-              backgroundColor: "rgba(5, 5, 20, 0.8)",
+              background: `
+                linear-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px),
+                linear-gradient(180deg, rgba(5, 5, 20, 0.95) 0%, rgba(10, 10, 35, 0.9) 50%, rgba(5, 5, 20, 0.95) 100%)
+              `,
+              backgroundSize: "30px 30px, 30px 30px, 100% 200%",
+              animation: "cyberScan 8s linear infinite",
+              "@keyframes cyberScan": {
+                "0%": {
+                  backgroundPosition: "0px 0px, 0px 0px, 0% 0%",
+                },
+                "100%": {
+                  backgroundPosition: "30px 30px, 30px 30px, 0% 200%",
+                },
+              },
               backdropFilter: "blur(20px)",
               border: "1px solid rgba(0, 240, 255, 0.3)",
               boxShadow: "inset 0 0 20px rgba(0, 240, 255, 0.08), 0 0 15px rgba(0, 240, 255, 0.1)",
@@ -420,7 +498,8 @@ export default function App() {
             <Box sx={{ flex: 1, width: "100%", p: 0.5 }}>
               <Editor
                 height="100%"
-                theme="vs-dark"
+                theme="cyberpunk-theme"
+                beforeMount={handleEditorBeforeMount}
                 defaultLanguage="cpp"
                 value={code}
                 onChange={handleCodeChange}
@@ -455,7 +534,13 @@ export default function App() {
                 flex: 1,
                 display: "flex",
                 flexDirection: "column",
-                backgroundColor: "rgba(5, 5, 20, 0.8)",
+                background: `
+                  linear-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px),
+                  linear-gradient(180deg, rgba(5, 5, 20, 0.95) 0%, rgba(10, 10, 35, 0.9) 50%, rgba(5, 5, 20, 0.95) 100%)
+                `,
+                backgroundSize: "30px 30px, 30px 30px, 100% 200%",
+                animation: "cyberScan 8s linear infinite",
                 backdropFilter: "blur(20px)",
                 border: "1px solid rgba(0, 240, 255, 0.3)",
                 boxShadow: "inset 0 0 20px rgba(0, 240, 255, 0.08), 0 0 15px rgba(0, 240, 255, 0.1)",
@@ -483,7 +568,8 @@ export default function App() {
               <Box sx={{ flex: 1, width: "100%", p: 0.5 }}>
                 <Editor
                   height="100%"
-                  theme="vs-dark"
+                  theme="cyberpunk-theme"
+                  beforeMount={handleEditorBeforeMount}
                   defaultLanguage="plaintext"
                   value={programInput}
                   onChange={handleInputChange}
@@ -509,7 +595,13 @@ export default function App() {
                 flex: 1,
                 display: "flex",
                 flexDirection: "column",
-                backgroundColor: "rgba(5, 5, 20, 0.8)",
+                background: `
+                  linear-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px),
+                  linear-gradient(180deg, rgba(5, 5, 20, 0.95) 0%, rgba(10, 10, 35, 0.9) 50%, rgba(5, 5, 20, 0.95) 100%)
+                `,
+                backgroundSize: "30px 30px, 30px 30px, 100% 200%",
+                animation: "cyberScan 8s linear infinite",
                 backdropFilter: "blur(20px)",
                 border: "1px solid rgba(0, 240, 255, 0.3)",
                 boxShadow: "inset 0 0 20px rgba(0, 240, 255, 0.08), 0 0 15px rgba(0, 240, 255, 0.1)",
@@ -537,7 +629,8 @@ export default function App() {
               <Box sx={{ flex: 1, width: "100%", p: 0.5 }}>
                 <Editor
                   height="100%"
-                  theme="vs-dark"
+                  theme="cyberpunk-theme"
+                  beforeMount={handleEditorBeforeMount}
                   defaultLanguage="plaintext"
                   value={programOutput}
                   options={{

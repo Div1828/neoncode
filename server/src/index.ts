@@ -47,13 +47,26 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", message: "NeonCode server active" });
 });
 
+const roomUsers = new Map<string, Set<string>>();
+
 // Socket.io connection setup
 io.on("connection", (socket) => {
   console.log(`A user connected: ${socket.id}`);
   
-  socket.on("join_room", (roomId: string) => {
+  socket.on("join_room", ({ roomId, username }: { roomId: string; username: string }) => {
     socket.join(roomId);
-    console.log(`User ${socket.id} joined room: ${roomId}`);
+    socket.data.roomId = roomId;
+    socket.data.username = username;
+
+    if (!roomUsers.has(roomId)) {
+      roomUsers.set(roomId, new Set());
+    }
+    if (username) {
+      roomUsers.get(roomId)!.add(username);
+    }
+
+    console.log(`User ${username} joined room: ${roomId}`);
+    io.to(roomId).emit("room_users", Array.from(roomUsers.get(roomId)!));
   });
 
   socket.on("code_change", ({ roomId, code }: { roomId: string; code: string }) => {
@@ -73,6 +86,16 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    const { roomId, username } = socket.data;
+    if (roomId && username && roomUsers.has(roomId)) {
+      const users = roomUsers.get(roomId)!;
+      users.delete(username);
+      if (users.size === 0) {
+        roomUsers.delete(roomId);
+      } else {
+        io.to(roomId).emit("room_users", Array.from(users));
+      }
+    }
     console.log(`User disconnected: ${socket.id}`);
   });
 });

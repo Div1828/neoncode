@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Box, Typography, Button, TextField, Paper, Divider } from "@mui/material";
 import { ShieldAlert, Zap, LogIn } from "lucide-react";
 
@@ -9,6 +9,22 @@ interface RoomSelectorProps {
 
 export default function RoomSelector({ username, onJoin }: RoomSelectorProps) {
   const [roomInput, setRoomInput] = useState("");
+  const [pastRooms, setPastRooms] = useState<Array<{ roomId: string; createdAt: string }>>([]);
+
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        const response = await fetch(`http://localhost:3001/api/user-rooms/${username}`);
+        if (response.ok) {
+          const data = await response.json();
+          setPastRooms(data.rooms || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch user rooms:", err);
+      }
+    };
+    fetchRooms();
+  }, [username]);
 
   const handleJoin = () => {
     if (roomInput.trim()) {
@@ -142,7 +158,78 @@ export default function RoomSelector({ username, onJoin }: RoomSelectorProps) {
           </Button>
         </Box>
 
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2, my: 1 }}>
+        {pastRooms.length > 0 && (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <Typography
+              variant="caption"
+              sx={{
+                fontFamily: "'Fira Code', monospace",
+                color: "secondary.main",
+                fontWeight: 700,
+                letterSpacing: "0.5px",
+                textTransform: "uppercase",
+              }}
+            >
+              [SECURE DECRYPTED PAST PORTALS]
+            </Typography>
+            <Box
+              sx={{
+                maxHeight: "130px",
+                overflowY: "auto",
+                border: "1px dashed rgba(0, 240, 255, 0.2)",
+                p: 1,
+                display: "flex",
+                flexDirection: "column",
+                gap: 1,
+              }}
+            >
+              {pastRooms.map((room) => (
+                <Box
+                  key={room.roomId}
+                  onClick={() => onJoin(room.roomId)}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    px: 1.5,
+                    py: 1,
+                    backgroundColor: "rgba(0, 240, 255, 0.02)",
+                    border: "1px solid rgba(0, 240, 255, 0.2)",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease-in-out",
+                    "&:hover": {
+                      backgroundColor: "rgba(0, 240, 255, 0.1)",
+                      borderColor: "primary.main",
+                      boxShadow: "0 0 8px rgba(0, 240, 255, 0.3)",
+                    },
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontFamily: "'Fira Code', monospace",
+                      color: "#00f0ff",
+                      fontWeight: 700,
+                    }}
+                  >
+                    PORTAL: {room.roomId}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: "text.secondary",
+                      fontSize: "0.7rem",
+                    }}
+                  >
+                    {new Date(room.createdAt).toLocaleDateString()}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        )}
+
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, my: 0.5 }}>
           <Divider sx={{ flex: 1, borderColor: "rgba(0, 240, 255, 0.2)" }} />
           <Typography sx={{ color: "rgba(0, 240, 255, 0.5)", fontFamily: "'Fira Code', monospace", fontSize: "0.8rem" }}>
             OR
