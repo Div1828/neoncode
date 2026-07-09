@@ -4,6 +4,7 @@ import Editor from "@monaco-editor/react";
 import { Play, Send, Terminal as TerminalIcon, MessageSquare, Cpu, ShieldAlert, LogOut } from "lucide-react";
 import { io } from "socket.io-client";
 import Auth from "./Auth";
+import RoomSelector from "./RoomSelector";
 
 // Establish socket connection to backend
 const socket = io("http://localhost:3001");
@@ -43,13 +44,16 @@ export default function App() {
   useEffect(() => {
     if (!token) return;
     const params = new URLSearchParams(window.location.search);
-    let room = params.get("room");
-    if (!room) {
-      room = Math.random().toString(36).substring(2, 8);
-      window.history.replaceState(null, "", `?room=${room}`);
+    const room = params.get("room");
+    if (room) {
+      setRoomId(room);
     }
-    setRoomId(room);
   }, [token]);
+
+  const handleRoomJoin = (newRoomId: string) => {
+    window.history.replaceState(null, "", `?room=${newRoomId}`);
+    setRoomId(newRoomId);
+  };
 
   // Fetch saved code state from server database when roomId changes
   useEffect(() => {
@@ -203,8 +207,13 @@ export default function App() {
   };
 
   // Guard routing / show login
-  if (!token) {
+  if (!token || !username) {
     return <Auth onAuthSuccess={handleAuthSuccess} />;
+  }
+
+  // Guard routing / show lobby
+  if (!roomId) {
+    return <RoomSelector username={username} onJoin={handleRoomJoin} />;
   }
 
   return (
@@ -613,6 +622,34 @@ export default function App() {
               </Button>
             </Box>
 
+            {/* Pinned Warning Banner */}
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 1.5,
+                p: 1,
+                backgroundColor: "rgba(255, 0, 60, 0.15)",
+                borderBottom: "1px solid rgba(255, 0, 60, 0.4)",
+                boxShadow: "inset 0 0 10px rgba(255, 0, 60, 0.1)",
+              }}
+            >
+              <ShieldAlert size={16} color="#ff003c" style={{ filter: "drop-shadow(0 0 3px #ff003c)" }} />
+              <Typography
+                variant="caption"
+                sx={{
+                  fontFamily: "'Fira Code', monospace",
+                  color: "#ff003c",
+                  fontWeight: 800,
+                  letterSpacing: "1px",
+                  textShadow: "0 0 5px rgba(255, 0, 60, 0.5)",
+                }}
+              >
+                [CRITICAL] EXECUTE RUN CODE TO PERMANENTLY COMMIT STATE TO CLOUD POSTGRES
+              </Typography>
+            </Box>
+
             {/* Monospace Output */}
             <Box
               sx={{
@@ -641,32 +678,7 @@ export default function App() {
                 {output}
               </Typography>
 
-              {/* Critical warning hint */}
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  mt: 2,
-                  pt: 1,
-                  borderTop: "1px dashed rgba(255, 0, 60, 0.3)",
-                }}
-              >
-                <ShieldAlert size={14} color="#ff003c" />
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontFamily: "'Fira Code', monospace",
-                    color: "secondary.main",
-                    fontSize: "0.68rem",
-                    fontWeight: 700,
-                    letterSpacing: "0.5px",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  [CRITICAL] EXECUTE RUN CODE TO PERMANENTLY COMMIT STATE TO CLOUD POSTGRES
-                </Typography>
-              </Box>
+              {/* Removed original warning hint from here */}
             </Box>
           </Box>
         </Box>
