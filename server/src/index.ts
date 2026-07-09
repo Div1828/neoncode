@@ -10,6 +10,9 @@ import executeRouter from "./routes/execute";
 import roomRouter from "./routes/room";
 import chatRouter from "./routes/chat";
 
+import { Pool } from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
+
 // Load environment variables
 dotenv.config();
 
@@ -34,10 +37,10 @@ const io = new Server(server, {
   }
 });
 
-// Initialize Prisma Client
-export const prisma = new PrismaClient({
-  accelerateUrl: process.env.DATABASE_URL || "postgres://placeholder"
-});
+// Initialize Prisma Client with pg adapter
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+export const prisma = new PrismaClient({ adapter });
 
 // Basic test route
 app.get("/health", (_req, res) => {
