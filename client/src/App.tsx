@@ -68,7 +68,7 @@ export default function App() {
 
     const fetchRoomCode = async () => {
       try {
-        const response = await fetch(`http://localhost:3001/api/room/${roomId}?username=${username}`);
+        const response = await fetch(`http://localhost:3001/api/room/${roomId}?username=${username ? encodeURIComponent(username) : ""}`);
         const data = await response.json();
         if (data.code !== null && data.code !== undefined) {
           isRemoteChange.current = true;
@@ -86,7 +86,7 @@ export default function App() {
     };
 
     fetchRoomCode();
-  }, [roomId, token]);
+  }, [roomId, token, username]);
 
   // Fetch chat logs from database when roomId changes
   useEffect(() => {
@@ -158,13 +158,15 @@ export default function App() {
       rules: [
         { token: "", foreground: "cbd5e1" },
         { token: "comment", foreground: "64748b", fontStyle: "italic" },
-        { token: "keyword", foreground: "ff003c", fontStyle: "bold" },
-        { token: "number", foreground: "00f0ff" },
-        { token: "string", foreground: "39ff14" },
+        { token: "keyword", foreground: "ff79c6", fontStyle: "bold" },
+        { token: "type", foreground: "00f0ff", fontStyle: "bold" },
+        { token: "number", foreground: "39ff14" },
+        { token: "string", foreground: "ffd700" },
       ],
       colors: {
         "editor.background": "#00000000",
         "editor.lineHighlightBackground": "rgba(0, 240, 255, 0.05)",
+        "editor.lineHighlightBorder": "#00000000",
       },
     });
   };
