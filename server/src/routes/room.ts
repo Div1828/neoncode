@@ -17,10 +17,10 @@ router.get("/room/:roomId", async (req: Request, res: Response): Promise<any> =>
     });
 
     if (!room) {
-      return res.json({ code: null });
+      return res.json({ code: null, input: null, output: null });
     }
 
-    return res.json({ code: room.currentCode });
+    return res.json({ code: room.currentCode, input: room.input, output: room.output });
   } catch (error) {
     console.error("Fetch room error:", error);
     return res.status(500).json({ error: "Internal server error" });

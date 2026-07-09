@@ -60,6 +60,14 @@ io.on("connection", (socket) => {
     socket.to(roomId).emit("receive_code", code);
   });
 
+  socket.on("input_change", ({ roomId, input }: { roomId: string; input: string }) => {
+    socket.to(roomId).emit("receive_input", input);
+  });
+
+  socket.on("output_change", ({ roomId, output }: { roomId: string; output: string }) => {
+    socket.to(roomId).emit("receive_output", output);
+  });
+
   socket.on("chat_message", ({ roomId, message }: { roomId: string; message: any }) => {
     socket.to(roomId).emit("receive_chat", message);
   });

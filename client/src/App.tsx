@@ -10,11 +10,12 @@ import RoomSelector from "./RoomSelector";
 const socket = io("http://localhost:3001");
 
 // Boilerplate C++ code
-const DEFAULT_CPP_CODE = `#include <iostream>
+const DEFAULT_CPP_CODE = `#include <bits/stdc++.h>
+using namespace std;
 
 int main() {
-    std::cout << "⚡ NEONCODE ENGINE v1.0 ⚡" << std::endl;
-    std::cout << "System ready. Write your C++ code here." << std::endl;
+    // Write your C++ code here
+    cout << "⚡ NEONCODE ENGINE v1.0 ⚡" << endl;
     return 0;
 }
 `;
@@ -28,9 +29,11 @@ interface ChatMessage {
 }
 
 export default function App() {
-  const [token, setToken] = useState<string | null>(localStorage.getItem("token"));
-  const [username, setUsername] = useState<string | null>(localStorage.getItem("username"));
+  const [token, setToken] = useState<string | null>(sessionStorage.getItem("token"));
+  const [username, setUsername] = useState<string | null>(sessionStorage.getItem("username"));
   const [code, setCode] = useState<string | undefined>(DEFAULT_CPP_CODE);
+  const [programInput, setProgramInput] = useState<string>("");
+  const [programOutput, setProgramOutput] = useState<string>("");
   const [output, setOutput] = useState<string>(
     "[SYSTEM-CORE] Initializing compiler modules...\n[DATALINK] Connecting to cloud Postgres...\n[STATUS] Terminal active. Press RUN CODE to compile.\n"
   );
@@ -39,6 +42,7 @@ export default function App() {
   const [roomId, setRoomId] = useState("");
 
   const isRemoteChange = useRef(false);
+  const isRemoteInputChange = useRef(false);
 
   // Initialize Room ID from query parameter or generate new one
   useEffect(() => {
@@ -68,6 +72,9 @@ export default function App() {
         if (data.code !== null && data.code !== undefined) {
           isRemoteChange.current = true;
           setCode(data.code);
+          isRemoteInputChange.current = true;
+          setProgramInput(data.input || "");
+          setProgramOutput(data.output || "");
           setOutput((prev) => prev + `[DATALINK] State hydrated successfully.\n`);
         } else {
           setOutput((prev) => prev + `[DATALINK] No existing state found. Initialized with C++ boilerplate.\n`);
@@ -117,12 +124,23 @@ export default function App() {
       setCode(newCode);
     });
 
+    socket.on("receive_input", (newInput: string) => {
+      isRemoteInputChange.current = true;
+      setProgramInput(newInput);
+    });
+
+    socket.on("receive_output", (newOutput: string) => {
+      setProgramOutput(newOutput);
+    });
+
     socket.on("receive_chat", (newMsg: ChatMessage) => {
       setChatMessages((prev) => [...prev, newMsg]);
     });
 
     return () => {
       socket.off("receive_code");
+      socket.off("receive_input");
+      socket.off("receive_output");
       socket.off("receive_chat");
     };
   }, [roomId, token]);
@@ -138,6 +156,19 @@ export default function App() {
     
     if (value !== undefined && roomId) {
       socket.emit("code_change", { roomId, code: value });
+    }
+  };
+
+  const handleInputChange = (value: string | undefined) => {
+    setProgramInput(value || "");
+    
+    if (isRemoteInputChange.current) {
+      isRemoteInputChange.current = false;
+      return;
+    }
+    
+    if (value !== undefined && roomId) {
+      socket.emit("input_change", { roomId, input: value });
     }
   };
 
@@ -181,13 +212,17 @@ export default function App() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ code, roomId }), // Pass roomId for PostgreSQL upsert
+        body: JSON.stringify({ code, roomId, input: programInput }), // Pass roomId and input
       });
       const data = await response.json();
       if (data.stderr) {
-        setOutput((prev) => prev + `\n[STDERR]\n${data.stderr}\n`);
+        setProgramOutput(`[STDERR]\n${data.stderr}`);
+        socket.emit("output_change", { roomId, output: `[STDERR]\n${data.stderr}` });
+        setOutput((prev) => prev + `\n[COMPILE ERROR / RUNTIME ERROR]\n`);
       } else {
-        setOutput((prev) => prev + `${data.stdout || ""}\n[PROCESS COMPLETED WITH EXIT CODE 0]\n`);
+        setProgramOutput(data.stdout || "");
+        socket.emit("output_change", { roomId, output: data.stdout || "" });
+        setOutput((prev) => prev + `[PROCESS COMPLETED WITH EXIT CODE 0]\n`);
       }
     } catch (err: any) {
       setOutput((prev) => prev + `\n[SYSTEM ERROR] Failed to contact compile agent: ${err.message}\n`);
@@ -200,8 +235,8 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("username");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("username");
     setToken(null);
     setUsername(null);
   };
@@ -341,57 +376,186 @@ export default function App() {
           zIndex: 2,
         }}
       >
-        {/* Left Pane - Editor (70% width) - Holographic Glass Layout */}
+        {/* Left Pane - CP Workspace (70% width) */}
         <Box
           sx={{
             width: "70%",
             height: "100%",
             display: "flex",
             flexDirection: "column",
-            backgroundColor: "rgba(5, 5, 20, 0.8)",
-            backdropFilter: "blur(20px)",
-            border: "1px solid rgba(0, 240, 255, 0.3)",
-            boxShadow: "inset 0 0 20px rgba(0, 240, 255, 0.08), 0 0 15px rgba(0, 240, 255, 0.1)",
+            gap: 1.5,
           }}
         >
+          {/* Top Panel - main.cpp - Holographic Glass Layout */}
           <Box
             sx={{
+              flex: 6.5,
               display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              px: 2,
-              py: 1.2,
-              backgroundColor: "rgba(14, 14, 40, 0.7)",
-              borderBottom: "1px solid rgba(0, 240, 255, 0.2)",
+              flexDirection: "column",
+              backgroundColor: "rgba(5, 5, 20, 0.8)",
+              backdropFilter: "blur(20px)",
+              border: "1px solid rgba(0, 240, 255, 0.3)",
+              boxShadow: "inset 0 0 20px rgba(0, 240, 255, 0.08), 0 0 15px rgba(0, 240, 255, 0.1)",
+              overflow: "hidden",
             }}
           >
-            <Typography variant="body2" sx={{ fontFamily: "'Fira Code', monospace", color: "primary.main", fontWeight: 700 }}>
-              main.cpp
-            </Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.75rem", fontFamily: "'Fira Code', monospace" }}>
-              C++ • MATRIX-FEED
-            </Typography>
-          </Box>
-          <Box sx={{ flex: 1, width: "100%", height: "100%", p: 0.5 }}>
-            <Editor
-              height="100%"
-              theme="vs-dark"
-              defaultLanguage="cpp"
-              value={code}
-              onChange={handleCodeChange}
-              options={{
-                fontSize: 14,
-                fontFamily: "'Fira Code', monospace",
-                minimap: { enabled: false },
-                scrollbar: {
-                  vertical: "visible",
-                  horizontal: "visible",
-                },
-                padding: { top: 10 },
-                lineNumbersMinChars: 3,
-                renderLineHighlight: "all",
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                px: 2,
+                py: 1,
+                backgroundColor: "rgba(14, 14, 40, 0.7)",
+                borderBottom: "1px solid rgba(0, 240, 255, 0.2)",
               }}
-            />
+            >
+              <Typography variant="body2" sx={{ fontFamily: "'Fira Code', monospace", color: "primary.main", fontWeight: 700 }}>
+                main.cpp
+              </Typography>
+              <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.75rem", fontFamily: "'Fira Code', monospace" }}>
+                C++ • SOURCE-LINK
+              </Typography>
+            </Box>
+            <Box sx={{ flex: 1, width: "100%", p: 0.5 }}>
+              <Editor
+                height="100%"
+                theme="vs-dark"
+                defaultLanguage="cpp"
+                value={code}
+                onChange={handleCodeChange}
+                options={{
+                  fontSize: 14,
+                  fontFamily: "'Fira Code', monospace",
+                  minimap: { enabled: false },
+                  scrollbar: {
+                    vertical: "visible",
+                    horizontal: "visible",
+                  },
+                  padding: { top: 10 },
+                  lineNumbersMinChars: 3,
+                  renderLineHighlight: "all",
+                }}
+              />
+            </Box>
+          </Box>
+
+          {/* Bottom Panel - Input & Output split - Holographic Glass Layout */}
+          <Box
+            sx={{
+              flex: 3.5,
+              display: "flex",
+              gap: 1.5,
+              height: "100%",
+            }}
+          >
+            {/* Input File Box */}
+            <Box
+              sx={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                backgroundColor: "rgba(5, 5, 20, 0.8)",
+                backdropFilter: "blur(20px)",
+                border: "1px solid rgba(0, 240, 255, 0.3)",
+                boxShadow: "inset 0 0 20px rgba(0, 240, 255, 0.08), 0 0 15px rgba(0, 240, 255, 0.1)",
+                overflow: "hidden",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  px: 2,
+                  py: 1,
+                  backgroundColor: "rgba(14, 14, 40, 0.7)",
+                  borderBottom: "1px solid rgba(0, 240, 255, 0.2)",
+                }}
+              >
+                <Typography variant="body2" sx={{ fontFamily: "'Fira Code', monospace", color: "primary.main", fontWeight: 700 }}>
+                  input.txt
+                </Typography>
+                <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.75rem", fontFamily: "'Fira Code', monospace" }}>
+                  STANDARD INPUT
+                </Typography>
+              </Box>
+              <Box sx={{ flex: 1, width: "100%", p: 0.5 }}>
+                <Editor
+                  height="100%"
+                  theme="vs-dark"
+                  defaultLanguage="plaintext"
+                  value={programInput}
+                  onChange={handleInputChange}
+                  options={{
+                    fontSize: 13,
+                    fontFamily: "'Fira Code', monospace",
+                    minimap: { enabled: false },
+                    scrollbar: {
+                      vertical: "visible",
+                      horizontal: "visible",
+                    },
+                    padding: { top: 5 },
+                    lineNumbersMinChars: 2,
+                    renderLineHighlight: "all",
+                  }}
+                />
+              </Box>
+            </Box>
+
+            {/* Output File Box */}
+            <Box
+              sx={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                backgroundColor: "rgba(5, 5, 20, 0.8)",
+                backdropFilter: "blur(20px)",
+                border: "1px solid rgba(0, 240, 255, 0.3)",
+                boxShadow: "inset 0 0 20px rgba(0, 240, 255, 0.08), 0 0 15px rgba(0, 240, 255, 0.1)",
+                overflow: "hidden",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  px: 2,
+                  py: 1,
+                  backgroundColor: "rgba(14, 14, 40, 0.7)",
+                  borderBottom: "1px solid rgba(0, 240, 255, 0.2)",
+                }}
+              >
+                <Typography variant="body2" sx={{ fontFamily: "'Fira Code', monospace", color: "primary.main", fontWeight: 700 }}>
+                  output.txt
+                </Typography>
+                <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.75rem", fontFamily: "'Fira Code', monospace" }}>
+                  STANDARD OUTPUT
+                </Typography>
+              </Box>
+              <Box sx={{ flex: 1, width: "100%", p: 0.5 }}>
+                <Editor
+                  height="100%"
+                  theme="vs-dark"
+                  defaultLanguage="plaintext"
+                  value={programOutput}
+                  options={{
+                    fontSize: 13,
+                    fontFamily: "'Fira Code', monospace",
+                    minimap: { enabled: false },
+                    scrollbar: {
+                      vertical: "visible",
+                      horizontal: "visible",
+                    },
+                    padding: { top: 5 },
+                    lineNumbersMinChars: 2,
+                    readOnly: true,
+                    renderLineHighlight: "all",
+                  }}
+                />
+              </Box>
+            </Box>
           </Box>
         </Box>
 
@@ -646,7 +810,7 @@ export default function App() {
                   textShadow: "0 0 5px rgba(255, 0, 60, 0.5)",
                 }}
               >
-                [CRITICAL] EXECUTE RUN CODE TO PERMANENTLY COMMIT STATE TO CLOUD POSTGRES
+                [CRITICAL] EXECUTE RUN CODE TO SAVE YOUR CODE
               </Typography>
             </Box>
 

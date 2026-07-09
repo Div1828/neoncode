@@ -22,6 +22,8 @@ model Room {
   id          String    @id @default(uuid())
   roomId      String    @unique
   currentCode String    @default("")
+  input       String    @default("")
+  output      String    @default("")
   language    String    @default("javascript")
   createdAt   DateTime  @default(now())
   messages    Message[]

@@ -38,8 +38,8 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
         throw new Error(data.error || "Authentication failed");
       }
 
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("username", data.username);
+      sessionStorage.setItem("token", data.token);
+      sessionStorage.setItem("username", data.username);
       onAuthSuccess(data.token, data.username);
     } catch (err: any) {
       setError(err.message || "Failed to connect to server");
